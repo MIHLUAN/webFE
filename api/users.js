@@ -1,59 +1,65 @@
-const express = require('express');
-const User = require('../models/user.model');
-const router = express.Router();
+const express = require("express");
+const mongoose = require("mongoose");
+const User = require("../models/user");
+const cors = require("cors");
 
-// Tạo mới User
-router.post('/', async (req, res) => {
-    try {
-        const user = new User(req.body);
-        await user.save();
-        res.status(201).json(user);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-});
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-// Lấy danh sách User
-router.get('/', async (req, res) => {
+// Kết nối MongoDB
+mongoose
+    .connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log("Connected to MongoDB"))
+    .catch(err => console.error("MongoDB connection error:", err));
+
+// Lấy danh sách tất cả người dùng
+app.get("/api/users", async (req, res) => {
     try {
         const users = await User.find();
         res.json(users);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
 
-// Lấy thông tin User theo ID
-router.get('/:id', async (req, res) => {
+// Tạo mới một người dùng
+app.post("/api/users", async (req, res) => {
     try {
-        const user = await User.findById(req.params.id);
-        if (!user) return res.status(404).json({ message: "User not found" });
-        res.json(user);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+        const { name, email, age } = req.body;
+        const newUser = new User({ name, email, age });
+        await newUser.save();
+        res.status(201).json(newUser);
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ error: "Error creating user" });
     }
 });
 
-// Cập nhật User
-router.put('/:id', async (req, res) => {
+// Xóa người dùng theo ID
+app.delete("/api/users/:id", async (req, res) => {
     try {
-        const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!user) return res.status(404).json({ message: "User not found" });
-        res.json(user);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
-    }
-});
-
-// Xóa User
-router.delete('/:id', async (req, res) => {
-    try {
-        const user = await User.findByIdAndDelete(req.params.id);
-        if (!user) return res.status(404).json({ message: "User not found" });
+        const { id } = req.params;
+        await User.findByIdAndDelete(id);
         res.json({ message: "User deleted successfully" });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Error deleting user" });
     }
 });
 
-module.exports = router;
+// Cập nhật người dùng theo ID
+app.put("/api/users/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, email, age } = req.body;
+        const updatedUser = await User.findByIdAndUpdate(id, { name, email, age }, { new: true });
+        res.json(updatedUser);
+    } catch (err) {
+        console.error(err);
+        res.status(400).json({ error: "Error updating user" });
+    }
+});
+
+module.exports = app;
